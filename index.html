@@ -7,7 +7,9 @@
 <style>
 *{box-sizing:border-box;margin:0}
 body{background:#0b0b12;color:#fff;font-family:system-ui,sans-serif;height:100dvh;overflow:hidden}
-#cam,#ov{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
+#cam,#ov{position:fixed;inset:0;width:100%;height:100%;object-fit:cover}
+.mirror{transform:scaleX(-1)}
+#flip{position:fixed;top:14px;right:14px;z-index:10;width:52px;height:52px;padding:0;margin:0;font-size:1.5rem}
 #ui{position:fixed;inset:0;display:flex;flex-direction:column;justify-content:space-between;padding:16px}
 h1{text-align:center;font-size:1.4rem;text-shadow:0 2px 8px #000}
 #bubble{background:#fff;color:#111;border-radius:22px;padding:16px 18px;font-size:1.15rem;font-weight:700;
@@ -28,6 +30,7 @@ button:active{transform:scale(.96)}
 <video id="cam" autoplay playsinline muted></video>
 <canvas id="ov"></canvas>
 <div id="scan"></div>
+<button id="flip">🔄</button>
 <div id="ui">
   <div><h1>🔥 RoastCam 🔥</h1><div id="status">Prêt à te faire humilier ?</div></div>
   <div>
@@ -77,12 +80,20 @@ const JOKES={
 let running=false;
 const pick=a=>a[Math.floor(Math.random()*a.length)];
 
+let front=true, stream=null;
+async function startCam(){
+  if(stream) stream.getTracks().forEach(t=>t.stop());
+  stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:front?'user':'environment'},audio:false});
+  cam.srcObject=stream; await cam.play();
+  ov.width=cam.videoWidth; ov.height=cam.videoHeight;
+  cam.classList.toggle('mirror',front); ov.classList.toggle('mirror',front);
+}
+$('flip').onclick=()=>{front=!front; startCam();};
+
 async function init(){
   btn.disabled=true; status.textContent='Chargement de l\'IA... 🧠';
   await Promise.all([faceapi.nets.tinyFaceDetector.loadFromUri(MODELS), faceapi.nets.faceExpressionNet.loadFromUri(MODELS)]);
-  const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user'},audio:false});
-  cam.srcObject=stream; await cam.play();
-  ov.width=cam.videoWidth; ov.height=cam.videoHeight;
+  await startCam();
   status.textContent='Place ton visage dans le cadre 😏';
   btn.textContent='🔥 ME ROAST'; btn.disabled=false; running=true;
   btn.onclick=roast; live();
@@ -99,7 +110,7 @@ async function live(){
         ctx.strokeStyle='#0f0'; ctx.lineWidth=4; ctx.strokeRect(x,y,width,height);
         ctx.font=width*.5+'px serif'; ctx.textAlign='center';
         const top=Object.entries(d.expressions).sort((a,b)=>b[1]-a[1])[0][0];
-        ctx.save(); ctx.translate(x+width/2,y-10); ctx.scale(-1,1); ctx.fillText(EMOJI[top]||'🤡',0,0); ctx.restore();
+        ctx.save(); ctx.translate(x+width/2,y-10); if(front) ctx.scale(-1,1); ctx.fillText(EMOJI[top]||'🤡',0,0); ctx.restore();
       }
     }
     await new Promise(r=>setTimeout(r,150));
