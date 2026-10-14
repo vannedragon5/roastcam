@@ -7,6 +7,7 @@
 <style>
 *{box-sizing:border-box;margin:0}
 body{background:#0b0b12;color:#fff;font-family:system-ui,sans-serif;height:100dvh;overflow:hidden}
+#count{text-align:center;font-weight:800;margin-top:6px;color:#ffd400;text-shadow:0 2px 6px #000}
 #cam,#ov{position:fixed;inset:0;width:100%;height:100%;object-fit:cover}
 .mirror{transform:scaleX(-1)}
 #flip{position:fixed;top:14px;right:14px;z-index:10;width:52px;height:52px;padding:0;margin:0;font-size:1.5rem}
@@ -33,6 +34,8 @@ button:active{transform:scale(.96)}
 <button id="flip">🔄</button>
 <div id="ui">
   <div><h1>🔥 RoastCam 🔥</h1><div id="status">Prêt à te faire humilier ?</div></div>
+
+ <div id="count">🔥 <span id="n">45 010</span> personnes déjà roastées</div>
   <div>
     <div id="bubble"></div>
     <button id="btn">📸 Démarrer</button>
@@ -108,8 +111,18 @@ async function roast(){
   if(navigator.vibrate) navigator.vibrate([100,50,100]);
   const u=new SpeechSynthesisUtterance(joke.replace(/[^\p{L}\p{N}\s,.?!']/gu,''));
   u.lang='fr-FR'; u.rate=1.05; u.pitch=1.2; speechSynthesis.speak(u);
+  bump(1);
   btn.textContent='🔁 Encore !'; btn.disabled=false; delete btn.dataset.busy;
 }
+
+let total=+localStorage.getItem('rc')||45010;
+const n=$('n');
+function bump(k=1){
+  total+=k; localStorage.setItem('rc',total);
+  n.textContent=total.toLocaleString('fr-FR');
+}
+bump(0);
+setInterval(()=>{ if(Math.random()<.5) bump(1+Math.floor(Math.random()*3)); },4000);
 
 btn.onclick=()=>init().catch(e=>{status.textContent='Erreur caméra : '+e.message; btn.disabled=false;});
 </script>
