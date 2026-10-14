@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>RoastCam 🤣</title>
+<style>
+*{box-sizing:border-box;margin:0}
+body{background:#0b0b12;color:#fff;font-family:system-ui,sans-serif;height:100dvh;overflow:hidden}
+#cam,#ov{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
+#ui{position:fixed;inset:0;display:flex;flex-direction:column;justify-content:space-between;padding:16px}
+h1{text-align:center;font-size:1.4rem;text-shadow:0 2px 8px #000}
+#bubble{background:#fff;color:#111;border-radius:22px;padding:16px 18px;font-size:1.15rem;font-weight:700;
+ line-height:1.35;display:none;box-shadow:0 8px 30px #000a;animation:pop .35s}
+@keyframes pop{from{transform:scale(.6) rotate(-4deg);opacity:0}}
+@keyframes shake{25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+.shake{animation:shake .3s 3}
+button{width:100%;padding:18px;border:0;border-radius:50px;font-size:1.2rem;font-weight:800;color:#fff;
+ background:linear-gradient(135deg,#ff2d75,#ff8a00);box-shadow:0 6px 20px #ff2d7580;margin-top:12px}
+button:active{transform:scale(.96)}
+#scan{position:fixed;left:0;right:0;height:5px;background:#0f0;box-shadow:0 0 20px #0f0;display:none;
+ animation:sc 1.2s linear infinite}
+@keyframes sc{from{top:0}to{top:100%}}
+#status{text-align:center;text-shadow:0 2px 6px #000;font-weight:700}
+</style>
+</head>
+<body>
+<video id="cam" autoplay playsinline muted></video>
+<canvas id="ov"></canvas>
+<div id="scan"></div>
+<div id="ui">
+  <div><h1>🔥 RoastCam 🔥</h1><div id="status">Prêt à te faire humilier ?</div></div>
+  <div>
+    <div id="bubble"></div>
+    <button id="btn">📸 Démarrer</button>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const cam=$('cam'), ov=$('ov'), btn=$('btn'), bubble=$('bubble'), status=$('status'), scan=$('scan');
+const MODELS='https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/';
+const opts=new faceapi.TinyFaceDetectorOptions({inputSize:224,scoreThreshold:.5});
+
+const EMOJI={happy:'🤡',sad:'😭',angry:'🤬',surprised:'😱',neutral:'🗿',fearful:'🫣',disgusted:'🤢'};
+
+const JOKES={
+ neutral:[
+  "Bro, ça va comme tu veux ? Parce qu'on dirait que tu as quitté le fond d'un chiote 🤣🤣",
+  "Ton visage est en mode avion depuis la naissance ✈️🗿",
+  "Tu fais quelle tête là ? Même ta photo de CNI a eu pitié de toi 😭",
+  "On dirait un loading à 99% qui ne finit jamais ⏳🤣"],
+ happy:[
+  "Arrête de sourire comme ça, on dirait un mec qui vient de gagner un pari à 100 FCFA 🤡",
+  "Ce sourire-là, c'est du forfait Wi-Fi gratuit : tout le monde veut y croire mais ça ne marche pas 😂",
+  "Tu souris ? Avec ce visage ? Respect, c'est du courage 👏🤣"],
+ sad:[
+  "Pourquoi cette tête ? Quelqu'un t'a dit que ton code compile ? 😭",
+  "Tu ressembles à un téléphone à 1% sans chargeur 🔋💀",
+  "Tranquille bro, même le miroir a demandé un remboursement 🪞😂"],
+ angry:[
+  "Calme-toi, on dirait un mec à qui on a pris sa part de poisson fumé 🐟🤬",
+  "Ta tête fait peur, même le réseau MTN a fui 📶💨",
+  "Tu boudes ? Le visage est déjà assez compliqué comme ça 😂"],
+ surprised:[
+  "Pourquoi tu me regardes comme si tu venais de voir ta facture de courant ? ⚡😱",
+  "La bouche ouverte comme ça, tu cherches du réseau ? 📡🤣",
+  "Tu t'es vu ou quoi ? Ah oui, c'est pour ça la surprise 😭"],
+ fearful:["T'as peur de quoi ? De ton propre visage ? 😂 Normal.","Tu trembles comme un ventilateur de 2009 🌀🤣"],
+ disgusted:["Eh oh, c'est MOI qui devrais faire cette tête en te voyant 🤢😂","Cette grimace, c'est ton visage au naturel ou un bug ? 🐛🤣"],
+ none:[
+  "Je ne vois rien... t'as mis ton doigt sur la caméra ou ton visage est en grève ? 🪧",
+  "Aucun visage détecté. Même l'IA refuse de regarder ça 🙈"]
+};
+
+let running=false;
+const pick=a=>a[Math.floor(Math.random()*a.length)];
+
+async function init(){
+  btn.disabled=true; status.textContent='Chargement de l\'IA... 🧠';
+  await Promise.all([faceapi.nets.tinyFaceDetector.loadFromUri(MODELS), faceapi.nets.faceExpressionNet.loadFromUri(MODELS)]);
+  const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user'},audio:false});
+  cam.srcObject=stream; await cam.play();
+  ov.width=cam.videoWidth; ov.height=cam.videoHeight;
+  status.textContent='Place ton visage dans le cadre 😏';
+  btn.textContent='🔥 ME ROAST'; btn.disabled=false; running=true;
+  btn.onclick=roast; live();
+}
+
+async function live(){
+  const ctx=ov.getContext('2d');
+  while(running){
+    if(!btn.dataset.busy){
+      const d=await faceapi.detectSingleFace(cam,opts).withFaceExpressions();
+      ctx.clearRect(0,0,ov.width,ov.height);
+      if(d){
+        const {x,y,width,height}=d.detection.box;
+        ctx.strokeStyle='#0f0'; ctx.lineWidth=4; ctx.strokeRect(x,y,width,height);
+        ctx.font=width*.5+'px serif'; ctx.textAlign='center';
+        const top=Object.entries(d.expressions).sort((a,b)=>b[1]-a[1])[0][0];
+        ctx.save(); ctx.translate(x+width/2,y-10); ctx.scale(-1,1); ctx.fillText(EMOJI[top]||'🤡',0,0); ctx.restore();
+      }
+    }
+    await new Promise(r=>setTimeout(r,150));
+  }
+}
+
+async function roast(){
+  btn.dataset.busy=1; btn.disabled=true; bubble.style.display='none';
+  speechSynthesis.cancel();
+  status.textContent='Analyse du désastre en cours... 🔬'; scan.style.display='block';
+  const votes={}; let seen=0;
+  const end=Date.now()+2500;
+  while(Date.now()<end){
+    const d=await faceapi.detectSingleFace(cam,opts).withFaceExpressions();
+    if(d){seen++; const t=Object.entries(d.expressions).sort((a,b)=>b[1]-a[1])[0][0]; votes[t]=(votes[t]||0)+1;}
+  }
+  scan.style.display='none';
+  const mood=seen?Object.entries(votes).sort((a,b)=>b[1]-a[1])[0][0]:'none';
+  const joke=pick(JOKES[mood]||JOKES.neutral);
+  status.textContent=seen?'Verdict :':'Hmm...';
+  bubble.textContent=joke; bubble.style.display='block';
+  bubble.classList.remove('shake'); void bubble.offsetWidth; bubble.classList.add('shake');
+  if(navigator.vibrate) navigator.vibrate([100,50,100]);
+  const u=new SpeechSynthesisUtterance(joke.replace(/[^\p{L}\p{N}\s,.?!']/gu,''));
+  u.lang='fr-FR'; u.rate=1.05; u.pitch=1.2; speechSynthesis.speak(u);
+  btn.textContent='🔁 Encore !'; btn.disabled=false; delete btn.dataset.busy;
+}
+
+btn.onclick=()=>init().catch(e=>{status.textContent='Erreur caméra : '+e.message; btn.disabled=false;});
+</script>
+</body>
+</html>
